@@ -15,8 +15,8 @@ cygwin=false
 
 # ----- Identify OS we are running under --------------------------------------
 case "`uname`" in
-CYGWIN*) cygwin=true;;
-Darwin) darwin=true;;
+  CYGWIN*) cygwin=true;;
+  Darwin) darwin=true;;
 esac
 
 #
@@ -128,11 +128,6 @@ JAVA_VM=-client
 declare -a java_args
 declare -a ruby_args
 
-# Force file.encoding to UTF-8 when on Mac, since Apple JDK defaults to MacRoman (JRUBY-3576)
-if $darwin; then
-  java_args=("${java_args[@]}" "-Dfile.encoding=UTF-8")
-fi
-
 # Split out any -J argument for passing to the JVM.
 # Scanning for args is aborted by '--'.
 while [ $# -gt 0 ]
@@ -215,7 +210,7 @@ do
 done
 
 # Force file.encoding to UTF-8 when on Mac, since Apple JDK defaults to MacRoman (JRUBY-3576)
-if [ `uname -s` = "Darwin" ]; then
+if $darwin; then
   java_args=("${java_args[@]}" "-Dfile.encoding=UTF-8")
 fi
 
