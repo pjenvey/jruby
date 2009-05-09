@@ -109,7 +109,7 @@ else
     done
 
     if $cygwin; then
-	CP=`cygpath -p -w "$CP"`
+        CP=`cygpath -p -w "$CP"`
     fi
 fi
 
@@ -151,10 +151,10 @@ do
             exit
         else
             if [ "${val:0:3}" = "-ea" ]; then
-		VERIFY_JRUBY="yes"
+                VERIFY_JRUBY="yes"
             elif [ "${val:0:16}" = "-Dfile.encoding=" ]; then
                 JAVA_ENCODING=$val
-	    fi
+            fi
             java_args=("${java_args[@]}" "${1:2}")
         fi
         ;;
