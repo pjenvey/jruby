@@ -233,6 +233,7 @@
         <zipfileset src="${build.lib.dir}/jna.jar"/>
         <zipfileset src="${build.lib.dir}/jffi.jar"/>
         <zipfileset src="${build.lib.dir}/jffi-i386-Linux.jar"/>
+        <zipfileset src="${build.lib.dir}/jffi-amd64-Linux.jar"/>
         <zipfileset src="${build.lib.dir}/jffi-Darwin.jar"/>
         <zipfileset src="${build.lib.dir}/jffi-x86-SunOS.jar"/>
         <zipfileset src="${build.lib.dir}/jffi-amd64-SunOS.jar"/>
@@ -269,6 +270,7 @@
         <zipfileset src="${build.lib.dir}/jna.jar"/>
         <zipfileset src="${build.lib.dir}/jffi.jar"/>
         <zipfileset src="${build.lib.dir}/jffi-i386-Linux.jar"/>
+        <zipfileset src="${build.lib.dir}/jffi-amd64-Linux.jar"/>
         <zipfileset src="${build.lib.dir}/jffi-Darwin.jar"/>
         <zipfileset src="${build.lib.dir}/jffi-x86-SunOS.jar"/>
         <zipfileset src="${build.lib.dir}/jffi-amd64-SunOS.jar"/>
@@ -356,6 +358,7 @@
         <zipfileset src="${build.lib.dir}/jna.jar"/>
         <zipfileset src="${build.lib.dir}/jffi.jar"/>
         <zipfileset src="${build.lib.dir}/jffi-i386-Linux.jar"/>
+        <zipfileset src="${build.lib.dir}/jffi-amd64-Linux.jar"/>
         <zipfileset src="${build.lib.dir}/jffi-Darwin.jar"/>
         <zipfileset src="${build.lib.dir}/jffi-x86-SunOS.jar"/>
         <zipfileset src="${build.lib.dir}/jffi-amd64-SunOS.jar"/>
@@ -1069,6 +1072,8 @@
     <include name="bin/generate_yaml_index.rb"/>
     <include name="bin/testrb"/>
     <include name="bin/ast*"/>
+    <include name="bin/spec.bat"/>
+    <include name="bin/rake.bat"/>
   </patternset>
 
   <patternset id="dist.lib.files">
@@ -1313,6 +1318,7 @@
       <zipfileset src="${build.lib.dir}/jna.jar"/>
       <zipfileset src="${build.lib.dir}/jffi.jar"/>
       <zipfileset src="${build.lib.dir}/jffi-i386-Linux.jar"/>
+      <zipfileset src="${build.lib.dir}/jffi-amd64-Linux.jar"/>
       <zipfileset src="${build.lib.dir}/jffi-Darwin.jar"/>
       <zipfileset src="${build.lib.dir}/jffi-x86-SunOS.jar"/>
       <zipfileset src="${build.lib.dir}/jffi-amd64-SunOS.jar"/>
