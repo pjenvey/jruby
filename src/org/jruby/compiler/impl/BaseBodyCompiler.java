@@ -1004,9 +1004,7 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
     }
 
     public void retrieveGlobalVariable(String name) {
-        loadRuntime();
-        method.ldc(name);
-        invokeUtilityMethod("getGlobalVariable", sig(IRubyObject.class, Ruby.class, String.class));
+        getScriptCompiler().getCacheCompiler().getGlobal(this, name);
     }
 
     public void assignGlobalVariable(String name) {
@@ -1016,10 +1014,7 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
     }
 
     public void assignGlobalVariable(String name, CompilerCallback value) {
-        value.call(this);
-        loadRuntime();
-        method.ldc(name);
-        invokeUtilityMethod("setGlobalVariable", sig(IRubyObject.class, IRubyObject.class, Ruby.class, String.class));
+        getScriptCompiler().getCacheCompiler().setGlobal(this, name, value);
     }
 
     public void negateCurrentValue() {
@@ -1988,9 +1983,11 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
         CompilerCallback bodyPrep = new CompilerCallback() {
             public void call(BodyCompiler context) {
                 if (receiverCallback == null) {
+                    // no receiver for singleton class
                     if (superCallback != null) {
+                        // but there's a superclass passed in, use it
                         classBody.loadRuntime();
-                        superCallback.call(classBody);
+                        classBody.method.aload(StandardASMCompiler.SELF_INDEX);
 
                         classBody.invokeUtilityMethod("prepareSuperClass", sig(RubyClass.class, params(Ruby.class, IRubyObject.class)));
                     } else {
@@ -2074,9 +2071,13 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
         method.aload(StandardASMCompiler.THIS);
         loadThreadContext();
         if (receiverCallback == null) {
-            // if there's no receiver, there could potentially be a superclass like class Foo << self
-            // so we pass in self here
-            method.aload(StandardASMCompiler.SELF_INDEX);
+            // if there's no receiver, evaluate and pass in the superclass, or
+            // pass self if it no superclass
+            if (superCallback != null) {
+                superCallback.call(this);
+            } else {
+                method.aload(StandardASMCompiler.SELF_INDEX);
+            }
         } else {
             // otherwise, there's a receiver, so we pass that in directly for the sclass logic
             receiverCallback.call(this);

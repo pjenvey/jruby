@@ -64,19 +64,6 @@ import org.jruby.util.collections.WeakHashSet;
  */
 @JRubyClass(name="Class", parent="Module")
 public class RubyClass extends RubyModule {
-    public static final int CS_IDX_INITIALIZE = 0;
-    public static final String[] CS_NAMES = {
-        "initialize"
-    };
-    private final CallSite[] baseCallSites = new CallSite[CS_NAMES.length];
-    {
-        for(int i = 0; i < CS_NAMES.length; i++) {
-            baseCallSites[i] = MethodIndex.getFunctionalCallSite(CS_NAMES[i]);
-        }
-    }
-    
-    private CallSite[] extraCallSites;
-    
     public static void createClassClass(Ruby runtime, RubyClass classClass) {
         classClass.index = ClassIndex.CLASS;
         classClass.kindOf = new RubyModule.KindOf() {
@@ -231,11 +218,6 @@ public class RubyClass extends RubyModule {
         obj.setBaseName(name);
         return obj;
     }
-
-    protected final Ruby runtime;
-    private ObjectAllocator allocator; // the default allocator
-    protected ObjectMarshal marshal;
-    private Set<RubyClass> subclasses;
 
     /** separate path for MetaClass and IncludedModuleWrapper construction
      *  (rb_class_boot version for MetaClasses)
@@ -727,12 +709,11 @@ public class RubyClass extends RubyModule {
      * @param subclass The subclass to add
      */
     public synchronized void addSubclass(RubyClass subclass) {
-        Set<RubyClass> oldSubclasses = subclasses;
-        Set<RubyClass> mySubclasses =
-                new WeakHashSet<RubyClass>(oldSubclasses == null ? 1 : oldSubclasses.size() + 1);
-        if (oldSubclasses != null) mySubclasses.addAll(oldSubclasses);
-        mySubclasses.add(subclass);
-        subclasses = Collections.unmodifiableSet(mySubclasses);
+        synchronized (runtime.getHierarchyLock()) {
+            Set<RubyClass> oldSubclasses = subclasses;
+            if (oldSubclasses == null) subclasses = oldSubclasses = new WeakHashSet<RubyClass>(4);
+            oldSubclasses.add(subclass);
+        }
     }
     
     /**
@@ -745,14 +726,32 @@ public class RubyClass extends RubyModule {
      * @param subclass The subclass to remove
      */
     public synchronized void removeSubclass(RubyClass subclass) {
-        Set<RubyClass> oldSubclasses = subclasses;
-        if (oldSubclasses == null) return;
-        
-        Set<RubyClass> mySubclasses = new WeakHashSet<RubyClass>(oldSubclasses.size() + 1);
-        mySubclasses.addAll(oldSubclasses);
-        mySubclasses.remove(subclass);
+        synchronized (runtime.getHierarchyLock()) {
+            Set<RubyClass> oldSubclasses = subclasses;
+            if (oldSubclasses == null) return;
 
-        subclasses = Collections.unmodifiableSet(mySubclasses);
+            oldSubclasses.remove(subclass);
+        }
+    }
+
+    /**
+     * Replace an existing subclass with a new one.
+     *
+     * This version always constructs a new set to avoid having to synchronize
+     * against the set when iterating it for invalidation in
+     * invalidateCacheDescendants.
+     *
+     * @param subclass The subclass to remove
+     * @param newSubclass The subclass to replace it with
+     */
+    public synchronized void replaceSubclass(RubyClass subclass, RubyClass newSubclass) {
+        synchronized (runtime.getHierarchyLock()) {
+            Set<RubyClass> oldSubclasses = subclasses;
+            if (oldSubclasses == null) return;
+
+            oldSubclasses.remove(subclass);
+            oldSubclasses.add(newSubclass);
+        }
     }
 
     /**
@@ -771,9 +770,11 @@ public class RubyClass extends RubyModule {
     protected void invalidateCacheDescendants() {
         super.invalidateCacheDescendants();
         // update all subclasses
-        Set<RubyClass> mySubclasses = subclasses;
-        if (mySubclasses != null) for (RubyClass subclass : mySubclasses) {
-            subclass.invalidateCacheDescendants();
+        synchronized (runtime.getHierarchyLock()) {
+            Set<RubyClass> mySubclasses = subclasses;
+            if (mySubclasses != null) for (RubyClass subclass : mySubclasses) {
+                subclass.invalidateCacheDescendants();
+            }
         }
     }
     
@@ -891,5 +892,22 @@ public class RubyClass extends RubyModule {
 
             return result;
         }
-    };    
+    };
+
+    protected final Ruby runtime;
+    private ObjectAllocator allocator; // the default allocator
+    protected ObjectMarshal marshal;
+    private Set<RubyClass> subclasses;
+    public static final int CS_IDX_INITIALIZE = 0;
+    public static final String[] CS_NAMES = {
+        "initialize"
+    };
+    private final CallSite[] baseCallSites = new CallSite[CS_NAMES.length];
+    {
+        for(int i = 0; i < CS_NAMES.length; i++) {
+            baseCallSites[i] = MethodIndex.getFunctionalCallSite(CS_NAMES[i]);
+        }
+    }
+
+    private CallSite[] extraCallSites;
 }

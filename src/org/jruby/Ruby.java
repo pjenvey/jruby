@@ -130,6 +130,7 @@ import com.kenai.constantine.ConstantSet;
 import com.kenai.constantine.platform.Errno;
 import java.util.EnumSet;
 import org.jruby.ast.RootNode;
+import org.jruby.internal.runtime.ReadonlyAccessor;
 import org.jruby.internal.runtime.methods.DynamicMethod;
 import org.jruby.javasupport.util.RuntimeHelpers;
 import org.jruby.management.BeanManager;
@@ -2082,7 +2083,7 @@ public final class Ruby {
      *
      */
     public void defineReadonlyVariable(String name, IRubyObject value) {
-        globalVariables.defineReadonly(name, new ValueAccessor(value));
+        globalVariables.getVariableForSet(name).setAccessor(new ReadonlyAccessor(name, new ValueAccessor(value)));
     }
 
     public Node parseFile(InputStream in, String file, DynamicScope scope, int lineNumber) {
@@ -3274,6 +3275,16 @@ public final class Ruby {
         }
     }
 
+    /**
+     * Get the global object used to synchronize class-hierarchy modifications like
+     * cache invalidation, subclass sets, and included hierarchy sets.
+     *
+     * @return The object to use for locking when modifying the hierarchy
+     */
+    public Object getHierarchyLock() {
+        return hierarchyLock;
+    }
+
     private volatile int constantGeneration = 1;
     private final ThreadService threadService;
     
@@ -3451,4 +3462,6 @@ public final class Ruby {
     
     // A thread pool to use for executing this runtime's Ruby threads
     private ExecutorService executor;
+
+    private Object hierarchyLock = new Object();
 }
