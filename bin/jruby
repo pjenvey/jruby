@@ -113,6 +113,11 @@ else
     fi
 fi
 
+if $cygwin; then
+    # switch delimiter only after building Unix style classpaths
+    CP_DELIMETER=";"
+fi
+
 # ----- Execute The Requested Command -----------------------------------------
 
 if [ -z "$JAVA_MEM" ] ; then
