@@ -1278,7 +1278,7 @@ public class RubyRegexp extends RubyObject implements ReOptions, EncodingCapable
     /** rb_reg_match
      * 
      */
-    @JRubyMethod(name = "=~", required = 1, reads = BACKREF, writes = BACKREF, compat = CompatVersion.RUBY1_8)
+    @JRubyMethod(name = "=~", required = 1, writes = BACKREF, compat = CompatVersion.RUBY1_8)
     @Override
     public IRubyObject op_match(ThreadContext context, IRubyObject str) {
         Ruby runtime = context.getRuntime();
@@ -1291,7 +1291,7 @@ public class RubyRegexp extends RubyObject implements ReOptions, EncodingCapable
         return RubyFixnum.newFixnum(runtime, start);
     }
     
-    @JRubyMethod(name = "=~", required = 1, reads = BACKREF, writes = BACKREF, compat = CompatVersion.RUBY1_9)
+    @JRubyMethod(name = "=~", required = 1, writes = BACKREF, compat = CompatVersion.RUBY1_9)
     public IRubyObject op_match19(ThreadContext context, IRubyObject arg) {
         Ruby runtime = context.getRuntime();
         if (arg.isNil()) {
@@ -2076,7 +2076,7 @@ public class RubyRegexp extends RubyObject implements ReOptions, EncodingCapable
     }
 
     public static RubyRegexp unmarshalFrom(UnmarshalStream input) throws java.io.IOException {
-        RubyRegexp result = newRegexp(input.getRuntime(), input.unmarshalString(), input.unmarshalInt());
+        RubyRegexp result = newRegexp(input.getRuntime(), input.unmarshalString(), input.readSignedByte());
         input.registerLinkTarget(result);
         return result;
     }
@@ -2084,6 +2084,6 @@ public class RubyRegexp extends RubyObject implements ReOptions, EncodingCapable
     public static void marshalTo(RubyRegexp regexp, MarshalStream output) throws java.io.IOException {
         output.registerLinkTarget(regexp);
         output.writeString(new String(regexp.str.bytes,regexp.str.begin,regexp.str.realSize));
-        output.writeInt(regexp.pattern.getOptions() & EMBEDDABLE);
+        output.writeByte(regexp.pattern.getOptions() & EMBEDDABLE);
     }
 }

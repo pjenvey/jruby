@@ -26,6 +26,11 @@ public abstract class InvalidMemoryIO implements MemoryIO {
     public MemoryIO slice(long offset) {
         return this;
     }
+
+    public java.nio.ByteBuffer asByteBuffer() {
+        throw ex();
+    }
+
     public final byte getByte(long offset) {
         throw ex();
     }
@@ -159,4 +164,17 @@ public abstract class InvalidMemoryIO implements MemoryIO {
     public final void clear() {
         throw ex();
     }
+
+    public byte[] getZeroTerminatedByteArray(long offset) {
+        throw ex();
+    }
+
+    public byte[] getZeroTerminatedByteArray(long offset, int maxlen) {
+        throw ex();
+    }
+
+    public void putZeroTerminatedByteArray(long offset, byte[] bytes, int off, int len) {
+        throw ex();
+    }
+
 }

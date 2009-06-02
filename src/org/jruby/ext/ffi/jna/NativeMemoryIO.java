@@ -31,6 +31,7 @@ import org.jruby.ext.ffi.*;
 import com.sun.jna.NativeLong;
 import com.sun.jna.Pointer;
 import com.sun.jna.ptr.PointerByReference;
+import org.jruby.Ruby;
 
 /**
  * JNA implementation of memory I/O operations.
@@ -42,7 +43,15 @@ public class NativeMemoryIO implements MemoryIO, DirectMemoryIO {
      */
     protected final Pointer ptr;
 
-    public NativeMemoryIO(Pointer ptr) {
+    /** The runtime this instance is attached to */
+    private final Ruby runtime;
+
+    static final DirectMemoryIO wrap(Ruby runtime, Pointer ptr) {
+        return ptr != null ? new NativeMemoryIO(runtime, ptr) : new NullMemoryIO(runtime);
+    }
+
+    public NativeMemoryIO(Ruby runtime, Pointer ptr) {
+        this.runtime = runtime;
         this.ptr = ptr;
     }
 
@@ -62,6 +71,10 @@ public class NativeMemoryIO implements MemoryIO, DirectMemoryIO {
 
     public final boolean isDirect() {
         return true;
+    }
+    
+    public final java.nio.ByteBuffer asByteBuffer() {
+        return ptr.getByteBuffer(0, Long.MAX_VALUE);
     }
 
     public final byte getByte(long offset) {
@@ -90,8 +103,7 @@ public class NativeMemoryIO implements MemoryIO, DirectMemoryIO {
     }
 
     public final DirectMemoryIO getMemoryIO(long offset) {
-        Pointer p = ptr.getPointer(offset);
-        return p != null ? new NativeMemoryIO(p) : null;
+        return wrap(runtime, ptr.getPointer(offset));
     }
 
     public final float getFloat(long offset) {
@@ -214,8 +226,21 @@ public class NativeMemoryIO implements MemoryIO, DirectMemoryIO {
         ptr.setMemory(offset, size, value);
     }
 
+    public byte[] getZeroTerminatedByteArray(long offset) {
+        return ptr.getByteArray(offset, (int) ptr.indexOf(offset, (byte) 0));
+    }
+
+    public byte[] getZeroTerminatedByteArray(long offset, int maxlen) {
+        return ptr.getByteArray(offset, (int) ptr.indexOf(offset, (byte) 0));
+    }
+
+    public void putZeroTerminatedByteArray(long offset, byte[] bytes, int off, int len) {
+        ptr.write(offset, bytes, off, len);
+        ptr.setByte(offset + len, (byte) 0);
+    }
+
     public NativeMemoryIO slice(long offset) {
-        return offset == 0 ? this : new NativeMemoryIO(ptr.share(offset));
+        return offset == 0 ? this : new NativeMemoryIO(runtime, ptr.share(offset));
     }
 
     @Override

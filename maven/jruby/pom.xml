@@ -90,13 +90,13 @@
     <dependency>
       <groupId>org.jruby.extras</groupId>
       <artifactId>constantine</artifactId>
-      <version>0.5</version>
+      <version>0.6</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>org.jruby.extras</groupId>
       <artifactId>jffi</artifactId>
-      <version>0.3</version>
+      <version>0.4</version>
       <scope>provided</scope>
     </dependency>
   </dependencies>

@@ -435,7 +435,7 @@ public final class DefaultMethodFactory {
     private static final class PointerInvoker extends BaseInvoker {
         public final IRubyObject invoke(Ruby runtime, Function function, HeapInvocationBuffer args) {
             final long address = invoker.invokeAddress(function, args);
-            return new BasePointer(runtime, address != 0 ? new NativeMemoryIO(address) : new NullMemoryIO(runtime));
+            return new BasePointer(runtime, NativeMemoryIO.wrap(runtime, address));
         }
         public static final FunctionInvoker INSTANCE = new PointerInvoker();
     }
@@ -448,20 +448,7 @@ public final class DefaultMethodFactory {
         private static final com.kenai.jffi.MemoryIO IO = com.kenai.jffi.MemoryIO.getInstance();
 
         public final IRubyObject invoke(Ruby runtime, Function function, HeapInvocationBuffer args) {
-            long address = invoker.invokeAddress(function, args);
-            if (address == 0) {
-                return runtime.getNil();
-            }
-            int len = (int) IO.getStringLength(address);
-            if (len == 0) {
-                return RubyString.newEmptyString(runtime);
-            }
-            byte[] bytes = new byte[len];
-            IO.getByteArray(address, bytes, 0, len);
-            
-            RubyString s =  RubyString.newStringShared(runtime, bytes);
-            s.setTaint(true);
-            return s;
+            return FFIUtil.getString(runtime, invoker.invokeAddress(function, args));
         }
         public static final FunctionInvoker INSTANCE = new StringInvoker();
     }

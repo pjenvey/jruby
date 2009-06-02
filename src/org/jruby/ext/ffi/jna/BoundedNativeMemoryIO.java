@@ -62,6 +62,10 @@ public class BoundedNativeMemoryIO implements MemoryIO, DirectMemoryIO {
         return ptr;
     }
 
+    public final java.nio.ByteBuffer asByteBuffer() {
+        return ptr.getByteBuffer(0, size);
+    }
+
     public final long getAddress() {
         PointerByReference ref = new PointerByReference(ptr);
         return ADDRESS_SIZE == 32
@@ -109,8 +113,7 @@ public class BoundedNativeMemoryIO implements MemoryIO, DirectMemoryIO {
 
     public final DirectMemoryIO getMemoryIO(long offset) {
         checkBounds(offset, ADDRESS_SIZE >> 3);
-        Pointer p = ptr.getPointer(offset);
-        return p != null ? new NativeMemoryIO(p) : null;
+        return NativeMemoryIO.wrap(runtime, ptr.getPointer(offset));
     }
 
     public final float getFloat(long offset) {
@@ -257,6 +260,22 @@ public class BoundedNativeMemoryIO implements MemoryIO, DirectMemoryIO {
     public final void setMemory(long offset, long size, byte value) {
         checkBounds(offset, size);
         ptr.setMemory(offset, size, value);
+    }
+    public byte[] getZeroTerminatedByteArray(long offset) {
+        checkBounds(offset, 1);
+        return ptr.getByteArray(offset, (int) ptr.indexOf(offset, (byte) 0));
+    }
+
+    public byte[] getZeroTerminatedByteArray(long offset, int maxlen) {
+        checkBounds(offset, 1);
+        return ptr.getByteArray(offset, (int) ptr.indexOf(offset, (byte) 0));
+    }
+
+    public void putZeroTerminatedByteArray(long offset, byte[] bytes, int off, int len) {
+        // Ensure room for terminating zero byte
+        checkBounds(offset, len + 1);
+        ptr.write(offset, bytes, off, len);
+        ptr.setByte(offset + len, (byte) 0);
     }
 
     public BoundedNativeMemoryIO slice(long offset) {

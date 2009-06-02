@@ -26,6 +26,9 @@ public class BasePointer extends Pointer {
         result.defineAnnotatedMethods(BasePointer.class);
         result.defineAnnotatedConstants(BasePointer.class);
 
+        // Add Pointer::NULL as a constant
+        module.getClass("Pointer").fastSetConstant("NULL", new BasePointer(runtime, new NullMemoryIO(runtime)));
+
         return result;
     }
     public static final RubyClass getBasePointerClass(Ruby runtime) {
@@ -37,12 +40,18 @@ public class BasePointer extends Pointer {
     public BasePointer(Ruby runtime, DirectMemoryIO io, long size) {
         super(runtime, getBasePointerClass(runtime), io, size);
     }
+    public BasePointer(Ruby runtime, DirectMemoryIO io, long size, int typeSize) {
+        super(runtime, getBasePointerClass(runtime), io, size, typeSize);
+    }
 //    BasePointer(Ruby runtime, long address) {
 //        super(runtime, getRubyClass(runtime),
 //                address != 0 ? new NativeMemoryIO(address) : new NullMemoryIO(runtime));
 //    }
     public BasePointer(Ruby runtime, RubyClass klass, DirectMemoryIO io, long size) {
         super(runtime, klass, io, size);
+    }
+    public BasePointer(Ruby runtime, RubyClass klass, DirectMemoryIO io, long size, int typeSize) {
+        super(runtime, klass, io, size, typeSize);
     }
 
     public final long getAddress() {
@@ -63,7 +72,7 @@ public class BasePointer extends Pointer {
                 String.format("#<Pointer address=0x%s>", hex));
     }
     
-    @JRubyMethod(name = "address")
+    @JRubyMethod(name = { "address", "to_i" })
     public IRubyObject address(ThreadContext context) {
         return context.getRuntime().newFixnum(getAddress());
     }
@@ -71,13 +80,11 @@ public class BasePointer extends Pointer {
     @Override
     protected final AbstractMemory slice(Ruby runtime, long offset) {
         return new BasePointer(runtime, getBasePointerClass(runtime),
-                (DirectMemoryIO) getMemoryIO().slice(offset), size == Long.MAX_VALUE ? Long.MAX_VALUE : size - offset);
+                (DirectMemoryIO) getMemoryIO().slice(offset), 
+                size == Long.MAX_VALUE ? Long.MAX_VALUE : size - offset, typeSize);
     }
 
     protected BasePointer getPointer(Ruby runtime, long offset) {
-        DirectMemoryIO ptr = (DirectMemoryIO) getMemoryIO().getMemoryIO(offset);
-        return new BasePointer(runtime,
-                ptr != null && !ptr.isNull() ? ptr : new NullMemoryIO(runtime),
-                Long.MAX_VALUE);
+        return new BasePointer(runtime, getMemoryIO().getMemoryIO(offset), Long.MAX_VALUE);
     }
 }

@@ -319,7 +319,13 @@ public final class StructLayoutBuilder extends RubyObject {
             if (value instanceof Pointer) {
                 getMemoryIO(ptr).putMemoryIO(getOffset(ptr), ((Pointer) value).getMemoryIO());
             } else if (value instanceof Struct) {
-                getMemoryIO(ptr).putMemoryIO(getOffset(ptr), ((Struct) value).getMemoryIO());
+                MemoryIO mem = ((Struct) value).getMemoryIO();
+
+                if (!(mem instanceof DirectMemoryIO)) {
+                    throw runtime.newArgumentError("Struct memory not backed by a native pointer");
+                }
+                getMemoryIO(ptr).putMemoryIO(getOffset(ptr), mem);
+
             } else if (value instanceof RubyInteger) {
                 getMemoryIO(ptr).putAddress(offset, Util.int64Value(ptr));
             } else if (value.respondsTo("to_ptr")) {
@@ -338,16 +344,15 @@ public final class StructLayoutBuilder extends RubyObject {
         }
 
         public IRubyObject get(Ruby runtime, StructLayout.Storage cache, IRubyObject ptr) {
-            MemoryIO memory = ((AbstractMemory) ptr).getMemoryIO().getMemoryIO(getOffset(ptr));
+            DirectMemoryIO memory = ((AbstractMemory) ptr).getMemoryIO().getMemoryIO(getOffset(ptr));
             IRubyObject old = cache.getCachedValue(this);
             if (old instanceof Pointer) {
                 MemoryIO oldMemory = ((Pointer) old).getMemoryIO();
-                if ((memory != null && memory.equals(oldMemory)) || (memory == null && oldMemory.isNull())) {
+                if (memory.equals(oldMemory)) {
                     return old;
                 }
             }
-            Pointer retval = new BasePointer(runtime,
-                    memory != null ? (DirectMemoryIO) memory : new NullMemoryIO(runtime));
+            Pointer retval = new BasePointer(runtime, memory);
             cache.putCachedValue(this, retval);
             return retval;
         }
@@ -383,12 +388,8 @@ public final class StructLayoutBuilder extends RubyObject {
             if (io == null || io.isNull()) {
                 return runtime.getNil();
             }
-            int len = (int) io.indexOf(0, (byte) 0, Integer.MAX_VALUE);
-            ByteList bl = new ByteList(len);
-            bl.length(len);
-            io.get(0, bl.unsafeBytes(), bl.begin(), len);
-        
-            return runtime.newString(bl);
+            
+            return RubyString.newStringNoCopy(runtime, io.getZeroTerminatedByteArray(0));
         }
         
         public void put(Ruby runtime, StructLayout.Storage cache, IRubyObject ptr, IRubyObject value) {
@@ -416,25 +417,13 @@ public final class StructLayoutBuilder extends RubyObject {
             this.length = size;
         }
         public void put(Ruby runtime, StructLayout.Storage cache, IRubyObject ptr, IRubyObject value) {
-            MemoryIO io = getMemoryIO(ptr);
             ByteList bl = value.convertToString().getByteList();
-            // Clamp to no longer than 
-            int len = Math.min(bl.length(), length - 1);
-            io.put(getOffset(ptr), bl.unsafeBytes(), bl.begin(), len);
-            io.putByte(getOffset(ptr) + len, (byte) 0);
+            getMemoryIO(ptr).putZeroTerminatedByteArray(offset, bl.unsafeBytes(), bl.begin(),
+                    Math.min(bl.length(), length - 1));
         }
 
         public IRubyObject get(Ruby runtime, StructLayout.Storage cache, IRubyObject ptr) {
-            MemoryIO io = getMemoryIO(ptr);
-            int len = (int) io.indexOf(getOffset(ptr), (byte) 0, length);
-            if (len < 0) {
-                len = length;
-            }
-            ByteList bl = new ByteList(len);
-            bl.length(len);
-            io.get(0, bl.unsafeBytes(), bl.begin(), len);
-        
-            return runtime.newString(bl);
+            return MemoryUtil.getTaintedString(runtime, getMemoryIO(ptr), getOffset(ptr), length);
         }
 
         public Collection<StructLayout.Member> getMembers() {

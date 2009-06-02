@@ -5,15 +5,19 @@ import java.util.Collection;
 import java.util.EnumMap;
 import java.util.Map;
 import org.jruby.Ruby;
+import org.jruby.RubyString;
 import org.jruby.ext.ffi.CallbackInfo;
 import org.jruby.ext.ffi.NativeType;
 import org.jruby.ext.ffi.StructLayout;
 import org.jruby.ext.ffi.Type;
+import org.jruby.runtime.builtin.IRubyObject;
 
 /**
  * Some utility functions for FFI <=> jffi conversions
  */
 public final class FFIUtil {
+    private static final com.kenai.jffi.MemoryIO IO = com.kenai.jffi.MemoryIO.getInstance();
+    
     private FFIUtil() {}
     private static final Map<NativeType, com.kenai.jffi.Type> typeMap = buildTypeMap();
 
@@ -102,5 +106,39 @@ public final class FFIUtil {
      */
     static final com.kenai.jffi.Struct newStruct(StructLayout layout) {
         return newStruct(layout.getRuntime(), layout.getFields());
+    }
+
+    /**
+     * Reads a nul-terminated string from native memory and boxes it up in a ruby
+     * string.
+     *
+     * @param runtime The ruby runtime for the resulting string.
+     * @param address The memory address to read the string from.
+     * @return A ruby string.
+     */
+    static final IRubyObject getString(Ruby runtime, long address) {
+        if (address == 0) {
+            return runtime.getNil();
+        }
+        byte[] bytes = getZeroTerminatedByteArray(address);
+        if (bytes.length == 0) {
+            return RubyString.newEmptyString(runtime);
+        }
+
+        RubyString s = RubyString.newStringNoCopy(runtime, bytes);
+        s.setTaint(true);
+        return s;
+    }
+    
+    static final byte[] getZeroTerminatedByteArray(long address) {
+        return IO.getZeroTerminatedByteArray(address);
+    }
+
+    static final byte[] getZeroTerminatedByteArray(long address, int maxlen) {
+        return IO.getZeroTerminatedByteArray(address, maxlen);
+    }
+    static final void putZeroTerminatedByteArray(long address, byte[] bytes, int off, int len) {
+        IO.putByteArray(address, bytes, off, len);
+        IO.putByte(address + len, (byte) 0);
     }
 }

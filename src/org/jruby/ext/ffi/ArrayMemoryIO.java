@@ -74,10 +74,14 @@ public final class ArrayMemoryIO implements MemoryIO {
         checkBounds(offset, 1);
         return offset == 0 ? this : new ArrayMemoryIO(runtime, array(), arrayOffset() + (int) offset, arrayLength() - (int) offset);
     }
+    
+    public java.nio.ByteBuffer asByteBuffer() {
+        return java.nio.ByteBuffer.wrap(buffer, offset, length).duplicate();
+    }
 
     public final DirectMemoryIO getMemoryIO(long offset) {
         checkBounds(offset, ADDRESS_SIZE >> 3);
-        return factory.wrapDirectMemory(getAddress(offset));
+        return factory.wrapDirectMemory(runtime, getAddress(offset));
     }
 
     public final void putMemoryIO(long offset, MemoryIO value) {
@@ -279,6 +283,30 @@ public final class ArrayMemoryIO implements MemoryIO {
         checkBounds(offset, size);
         Arrays.fill(buffer, index(offset), (int) size, value);
     }
+
+    public final byte[] getZeroTerminatedByteArray(long offset) {
+        checkBounds(offset, 1);
+        int len = indexOf(offset, (byte) 0);
+        byte[] bytes = new byte[len != -1 ? len : length - (int) offset];
+        System.arraycopy(buffer, index(offset), bytes, 0, bytes.length);
+        return bytes;
+    }
+
+    public final byte[] getZeroTerminatedByteArray(long offset, int maxlen) {
+        checkBounds(offset, 1);
+        int len = indexOf(offset, (byte) 0, maxlen);
+        byte[] bytes = new byte[len != -1 ? len : length - (int) offset];
+        System.arraycopy(buffer, index(offset), bytes, 0, bytes.length);
+        return bytes;
+    }
+
+    public void putZeroTerminatedByteArray(long offset, byte[] bytes, int off, int len) {
+        // Ensure room for terminating zero byte
+        checkBounds(offset, len + 1);
+        System.arraycopy(bytes, off, buffer, index(offset), len);
+        buffer[len] = (byte) 0;
+    }
+
 
     public final void clear() {
         Arrays.fill(buffer, offset, length, (byte) 0);

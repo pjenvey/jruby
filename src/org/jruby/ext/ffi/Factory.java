@@ -87,6 +87,9 @@ public abstract class Factory {
 
             RubyModule ffi = runtime.defineModule("FFI");
             Factory factory = Factory.getInstance();
+            if (factory.getClass().getName().contains("org.jruby.ext.ffi.jna")) {
+                runtime.getWarnings().warn("Deprecated JNA backend used for FFI");
+            }
             factory.init(runtime, ffi);
         }
     }
@@ -154,6 +157,7 @@ public abstract class Factory {
             }
             
             Platform.createPlatformModule(runtime, ffi);
+            IOModule.createIOModule(runtime, ffi);
         }
     }
     
@@ -183,7 +187,7 @@ public abstract class Factory {
      * 
      * @return A new <tt>MemoryIO</tt>.
      */
-    public abstract DirectMemoryIO wrapDirectMemory(long address);
+    public abstract DirectMemoryIO wrapDirectMemory(Ruby runtime, long address);
 
 
     public abstract CallbackManager getCallbackManager();

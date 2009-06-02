@@ -54,6 +54,7 @@ import org.jruby.RubyString;
 import org.jruby.RubyStruct;
 import org.jruby.RubySymbol;
 import org.jruby.IncludedModuleWrapper;
+import org.jruby.RubyBasicObject;
 import org.jruby.runtime.ClassIndex;
 import org.jruby.runtime.Constants;
 import org.jruby.runtime.builtin.IRubyObject;
@@ -203,6 +204,9 @@ public class MarshalStream extends FilterOutputStream {
         // classes that have extended core native types to piggyback on their
         // marshalling logic.
         if (value instanceof CoreObjectType) {
+            if (value instanceof DataType) {
+                throw value.getRuntime().newTypeError("no marshal_dump is defined for class " + value.getMetaClass().getName());
+            }
             int nativeTypeIndex = ((CoreObjectType)value).getNativeTypeIndex();
 
             switch (nativeTypeIndex) {
@@ -285,6 +289,8 @@ public class MarshalStream extends FilterOutputStream {
             case ClassIndex.TRUE:
                 write('T');
                 return;
+            default:
+                throw runtime.newTypeError("can't dump " + value.getMetaClass().getName());
             }
         } else {
             dumpDefaultObjectHeader(value.getMetaClass());
@@ -454,5 +460,9 @@ public class MarshalStream extends FilterOutputStream {
             out.write(value < 0 ? -len : len);
             out.write(buf, 0, i + 1);
         }
+    }
+
+    public void writeByte(int value) throws IOException {
+        out.write(value);
     }
 }

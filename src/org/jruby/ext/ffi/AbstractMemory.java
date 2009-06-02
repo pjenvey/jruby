@@ -55,6 +55,10 @@ abstract public class AbstractMemory extends RubyObject {
 
     /** The total size of the memory area */
     protected final long size;
+
+    /** The size of each element of this memory area - e.g. :char is 1, :int is 4 */
+    protected final int typeSize;
+
     /** The Memory I/O object */
     protected final MemoryIO io;
     
@@ -95,10 +99,16 @@ abstract public class AbstractMemory extends RubyObject {
     }
 
     protected AbstractMemory(Ruby runtime, RubyClass klass, MemoryIO io, long size) {
+        this(runtime, klass, io, size, 1);
+    }
+
+    protected AbstractMemory(Ruby runtime, RubyClass klass, MemoryIO io, long size, int typeSize) {
         super(runtime, klass);
         this.io = io;
         this.size = size;
+        this.typeSize = typeSize;
     }
+
     /**
      * Gets the memory I/O accessor to read/write to the memory area.
      *
@@ -141,6 +151,16 @@ abstract public class AbstractMemory extends RubyObject {
     @JRubyMethod(name = "to_s", optional = 1)
     public IRubyObject to_s(ThreadContext context, IRubyObject[] args) {
         return RubyString.newString(context.getRuntime(), ABSTRACT_MEMORY_RUBY_CLASS + "[size=" + size + "]");
+    }
+
+    @JRubyMethod(name = "[]")
+    public final IRubyObject aref(ThreadContext context, IRubyObject indexArg) {
+        final int index = RubyNumeric.num2int(indexArg);
+        final int offset = index * typeSize;
+        if (offset >= size) {
+            throw context.getRuntime().newIndexError(String.format("Index %d out of range", index));
+        }
+        return slice(context.getRuntime(), offset);
     }
 
     /**
@@ -186,14 +206,26 @@ abstract public class AbstractMemory extends RubyObject {
         getMemoryIO().setMemory(0, size, (byte) 0);
         return this;
     }
+
     /**
-     * Gets the total size (in bytes) of the MemoryPointer.
+     * Gets the total size (in bytes) of the Memory.
      *
      * @return The total size in bytes.
      */
-    @JRubyMethod(name = "total")
+    @JRubyMethod(name = { "total", "size", "length" })
     public IRubyObject total(ThreadContext context) {
         return RubyFixnum.newFixnum(context.getRuntime(), size);
+    }
+    
+    /**
+     * Indicates how many bytes the intrinsic type of the memory uses.
+     *
+     * @param context
+     * @return
+     */
+    @JRubyMethod(name = "type_size")
+    public final IRubyObject type_size(ThreadContext context) {
+        return context.getRuntime().newFixnum(typeSize);
     }
 
     /**
@@ -587,52 +619,82 @@ abstract public class AbstractMemory extends RubyObject {
 
         return this;
     }
+
+    @JRubyMethod(name = "read_string")
+    public IRubyObject read_string(ThreadContext context) {
+        return MemoryUtil.getTaintedString(context.getRuntime(), getMemoryIO(), 0);
+    }
+
+    @JRubyMethod(name = "read_string")
+    public IRubyObject read_string(ThreadContext context, IRubyObject rbLength) {
+        /* When a length is given, read_string acts like get_bytes */
+        return !rbLength.isNil()
+                ? MemoryUtil.getTaintedByteString(context.getRuntime(), getMemoryIO(), 0, Util.int32Value(rbLength))
+                : MemoryUtil.getTaintedString(context.getRuntime(), getMemoryIO(), 0);
+    }
+
     @JRubyMethod(name = "get_string", required = 1)
     public IRubyObject get_string(ThreadContext context, IRubyObject offArg) {
-        long off = getOffset(offArg);
-        int len = (int) getMemoryIO().indexOf(off, (byte) 0);
-        ByteList bl = new ByteList(len);
-        getMemoryIO().get(off, bl.unsafeBytes(), bl.begin(), len);
-        bl.length(len);
-        RubyString s = context.getRuntime().newString(bl);
-        s.setTaint(true);
-        return s;
+        return MemoryUtil.getTaintedString(context.getRuntime(), getMemoryIO(), getOffset(offArg));
     }
+
     @JRubyMethod(name = "get_string", required = 2)
     public IRubyObject get_string(ThreadContext context, IRubyObject offArg, IRubyObject lenArg) {
-        long off = getOffset(offArg);
-        int maxlen = Util.int32Value(lenArg);
-        int len = (int) getMemoryIO().indexOf(off, (byte) 0, maxlen);
-        if (len < 0 || len > maxlen) {
-            len = maxlen;
-        }
-        ByteList bl = new ByteList(len);
-        getMemoryIO().get(off, bl.unsafeBytes(), bl.begin(), len);
-        bl.length(len);
-        RubyString s = context.getRuntime().newString(bl);
-        s.setTaint(true);
-        return s;
+        return MemoryUtil.getTaintedString(context.getRuntime(), getMemoryIO(),
+                getOffset(offArg), Util.int32Value(lenArg));
     }
+
+    @JRubyMethod(name = { "get_array_of_string" }, required = 1)
+    public IRubyObject get_array_of_string(ThreadContext context, IRubyObject rbOffset) {
+        final int POINTER_SIZE = (Platform.getPlatform().addressSize() / 8);
+        
+        final Ruby runtime = context.getRuntime();
+        final RubyArray arr = RubyArray.newArray(runtime);
+
+        for (long off = getOffset(rbOffset); off <= size - POINTER_SIZE; off += POINTER_SIZE) {
+            final MemoryIO mem = getMemoryIO().getMemoryIO(off);
+            if (mem == null || mem.isNull()) {
+                break;
+            }
+            arr.add(MemoryUtil.getTaintedString(runtime, mem, 0));
+        }
+
+        return arr;
+    }
+
+    @JRubyMethod(name = { "get_array_of_string" }, required = 2)
+    public IRubyObject get_array_of_string(ThreadContext context, IRubyObject rbOffset, IRubyObject rbCount) {
+        final int POINTER_SIZE = (Platform.getPlatform().addressSize() / 8);
+        final long off = getOffset(rbOffset);
+        final int count = Util.int32Value(rbCount);
+
+        final Ruby runtime = context.getRuntime();
+        final RubyArray arr = RubyArray.newArray(runtime, count);
+
+        for (int i = 0; i < count; ++i) {
+            final MemoryIO mem = getMemoryIO().getMemoryIO(off + (i * POINTER_SIZE));
+            arr.add(mem != null && !mem.isNull()
+                    ? MemoryUtil.getTaintedString(runtime, mem, 0)
+                    : runtime.getNil());
+        }
+
+        return arr;
+    }
+
     @JRubyMethod(name = "put_string")
     public IRubyObject put_string(ThreadContext context, IRubyObject offArg, IRubyObject strArg) {
         long off = getOffset(offArg);
         ByteList bl = strArg.convertToString().getByteList();
-
-        getMemoryIO().put(off, bl.unsafeBytes(), bl.begin(), bl.length());
-        getMemoryIO().putByte(off + bl.length(), (byte) 0);
+        getMemoryIO().putZeroTerminatedByteArray(off, bl.unsafeBytes(), bl.begin(), bl.length());
         return this;
     }
+
     @JRubyMethod(name = "get_bytes")
     public IRubyObject get_bytes(ThreadContext context, IRubyObject offArg, IRubyObject lenArg) {
-        long off = getOffset(offArg);
-        int len = Util.int32Value(lenArg);
-        ByteList bl = new ByteList(len);
-        getMemoryIO().get(off, bl.unsafeBytes(), bl.begin(), len);
-        bl.length(len);
-        RubyString s = context.getRuntime().newString(bl);
-        s.setTaint(true);
-        return s;
+        return MemoryUtil.getTaintedByteString(context.getRuntime(), getMemoryIO(),
+                getOffset(offArg), Util.int32Value(lenArg));
     }
+
     @JRubyMethod(name = "put_bytes", required = 2, optional = 2)
     public IRubyObject put_bytes(ThreadContext context, IRubyObject[] args) {
         long off = getOffset(args[0]);
@@ -694,8 +756,14 @@ abstract public class AbstractMemory extends RubyObject {
 
         long off = getOffset(offset);
         for (int i = 0; i < count; ++i) {
-            Pointer ptr = (Pointer) arr.entry(i);
-            getMemoryIO().putMemoryIO(off + (i * POINTER_SIZE), ptr.getMemoryIO());
+            IRubyObject ptr = arr.entry(i);
+            if (ptr instanceof Pointer) {
+                getMemoryIO().putMemoryIO(off + (i * POINTER_SIZE), ((Pointer) ptr).getMemoryIO());
+            } else if (ptr.isNil()) {
+                getMemoryIO().putAddress(off + (i * POINTER_SIZE), 0);
+            } else {
+                throw context.getRuntime().newTypeError(ptr, context.getRuntime().fastGetModule("FFI").fastGetClass("Pointer"));
+            }
         }
         return this;
     }

@@ -615,6 +615,12 @@ public class RubyTime extends RubyObject {
         return newInstance(context, recv);
     }
 
+    @JRubyMethod(name = "times", meta = true, compat = CompatVersion.RUBY1_8)
+    public static IRubyObject times(ThreadContext context, IRubyObject recv) {
+        context.getRuntime().getWarnings().warn("obsolete method Time::times; use Process::times");
+        return RubyProcess.times(context, recv, Block.NULL_BLOCK);
+    }
+
     @JRubyMethod(name = "now", backtrace = true, meta = true)
     public static IRubyObject newInstance(ThreadContext context, IRubyObject recv) {
         IRubyObject obj = ((RubyClass) recv).allocate();
@@ -645,7 +651,9 @@ public class RubyTime extends RubyObject {
             // the decimal point is honored.
             if (arg instanceof RubyFloat) {
                 double dbl = ((RubyFloat) arg).getDoubleValue();
-                long micro = (long) ((dbl - seconds) * 1000000);
+                long micro = Math.round((dbl - seconds) * 1000000);
+                if(dbl < 0)
+                    micro += 1000000;
                 millisecs = micro / 1000;
                 microsecs = micro % 1000;
             }

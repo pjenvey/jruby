@@ -14,7 +14,6 @@ import org.jruby.RubyClass;
 import org.jruby.RubyModule;
 import org.jruby.RubyNumeric;
 import org.jruby.RubyProc;
-import org.jruby.RubyString;
 import org.jruby.anno.JRubyClass;
 import org.jruby.ext.ffi.BasePointer;
 import org.jruby.ext.ffi.CallbackInfo;
@@ -391,9 +390,7 @@ public class CallbackManager extends org.jruby.ext.ffi.CallbackManager {
                         return runtime.getNil();
                     }
                 } else {
-                    return new BasePointer(runtime, address != 0
-                            ? new NativeMemoryIO(address)
-                            : new NullMemoryIO(runtime));
+                    return new BasePointer(runtime, NativeMemoryIO.wrap(runtime, address));
                 }
             }
             case STRING:
@@ -412,20 +409,7 @@ public class CallbackManager extends org.jruby.ext.ffi.CallbackManager {
      * @return A new Ruby string object or nil if string is NULL.
      */
     private static final IRubyObject getStringParameter(Ruby runtime, Closure.Buffer buffer, int index) {
-        long address = buffer.getAddress(index);
-        if (address == 0) {
-            return runtime.getNil();
-        }
-        int len = (int) IO.getStringLength(address);
-        if (len == 0) {
-            return RubyString.newEmptyString(runtime);
-        }
-        byte[] bytes = new byte[len];
-        IO.getByteArray(address, bytes, 0, len);
-
-        RubyString s = RubyString.newStringShared(runtime, bytes);
-        s.setTaint(true);
-        return s;
+        return FFIUtil.getString(runtime, buffer.getAddress(index));
     }
 
     /**

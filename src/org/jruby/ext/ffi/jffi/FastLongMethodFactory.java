@@ -219,6 +219,7 @@ public class FastLongMethodFactory {
             return context.getRuntime().newFloat(Double.longBitsToDouble(value));
         }
     }
+
     static final class PointerResultConverter implements LongResultConverter {
         static final long ADDRESS_MASK = Platform.getPlatform().addressSize() == 32
                 ? 0xffffffffL : 0xffffffffffffffffL;
@@ -226,7 +227,7 @@ public class FastLongMethodFactory {
         public final IRubyObject fromNative(ThreadContext context, long value) {
             final long address = ((long) value) & ADDRESS_MASK;
             return new BasePointer(context.getRuntime(),
-                    address != 0 ? new NativeMemoryIO(address) : new NullMemoryIO(context.getRuntime()));
+                    NativeMemoryIO.wrap(context.getRuntime(), address));
         }
     }
 
@@ -235,19 +236,7 @@ public class FastLongMethodFactory {
         public static final LongResultConverter INSTANCE = new StringResultConverter();
         public final IRubyObject fromNative(ThreadContext context, long value) {
             long address = value & PointerResultConverter.ADDRESS_MASK;
-            if (address == 0) {
-                return context.getRuntime().getNil();
-            }
-            int len = (int) IO.getStringLength(address);
-            if (len == 0) {
-                return RubyString.newEmptyString(context.getRuntime());
-            }
-            byte[] bytes = new byte[len];
-            IO.getByteArray(address, bytes, 0, len);
-
-            RubyString s =  RubyString.newStringShared(context.getRuntime(), bytes);
-            s.setTaint(true);
-            return s;
+            return FFIUtil.getString(context.getRuntime(), address);
         }
     }
     static abstract class BaseParameterConverter implements LongParameterConverter {

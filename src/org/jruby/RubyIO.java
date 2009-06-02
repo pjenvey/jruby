@@ -67,6 +67,7 @@ import org.jruby.exceptions.RaiseException;
 import org.jruby.libraries.FcntlLibrary;
 import org.jruby.platform.Platform;
 import org.jruby.runtime.Block;
+import org.jruby.runtime.ClassIndex;
 import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
@@ -309,6 +310,14 @@ public class RubyIO extends RubyObject {
             return new RubyIO(runtime, klass);
         }
     };
+
+    /*
+     * We use FILE versus IO to match T_FILE in MRI.
+     */
+    @Override
+    public int getNativeTypeIndex() {
+        return ClassIndex.FILE;
+    }
 
     public static RubyClass createIOClass(Ruby runtime) {
         RubyClass ioClass = runtime.defineClass("IO", runtime.getObject(), IO_ALLOCATOR);
@@ -2007,7 +2016,14 @@ public class RubyIO extends RubyObject {
         return ((ChannelStream) openFile.getMainStream()).isBlocking();
     }
 
-    @JRubyMethod(name = "fcntl", required = 2)
+    @JRubyMethod(name = "fcntl")
+    public IRubyObject fcntl(ThreadContext context, IRubyObject cmd) {
+        // TODO: This version differs from ioctl by checking whether fcntl exists
+        // and raising notimplemented if it doesn't; perhaps no difference for us?
+        return ctl(context.getRuntime(), cmd, null);
+    }
+
+    @JRubyMethod(name = "fcntl")
     public IRubyObject fcntl(ThreadContext context, IRubyObject cmd, IRubyObject arg) {
         // TODO: This version differs from ioctl by checking whether fcntl exists
         // and raising notimplemented if it doesn't; perhaps no difference for us?
@@ -2034,7 +2050,7 @@ public class RubyIO extends RubyObject {
         
         // FIXME: Arg may also be true, false, and nil and still be valid.  Strangely enough, 
         // protocol conversion is not happening in Ruby on this arg?
-        if (arg.isNil() || arg == runtime.getFalse()) {
+        if (arg == null || arg.isNil() || arg == runtime.getFalse()) {
             nArg = 0;
         } else if (arg instanceof RubyFixnum) {
             nArg = RubyFixnum.fix2long(arg);
@@ -3047,7 +3063,12 @@ public class RubyIO extends RubyObject {
        
         try {
             if (!arg1.isNil()) {
-                return file.read(context, arg1);
+                if (arg1 instanceof RubyHash) {
+                    // TODO: hash args for encoding, etc, are not yet supported; ignore
+                    return file.read(context);
+                } else {
+                    return file.read(context, arg1);
+                }
             } else {
                 return file.read(context);
             }

@@ -60,6 +60,13 @@ public interface MemoryIO {
     public MemoryIO slice(long offset);
 
     /**
+     * Creates a view of this memory object as a java NIO byte buffer.
+     *
+     * @return A ByteBuffer instance
+     */
+    public java.nio.ByteBuffer asByteBuffer();
+    
+    /**
      * Reads an 8 bit integer value from the memory area.
      * 
      * @param offset The offset within the memory area to read the value.
@@ -361,4 +368,31 @@ public interface MemoryIO {
      * @param value The value to set each byte to.
      */
     public void setMemory(long offset, long size, byte value);
+
+    /**
+     * Reads a zero terminated byte array (e.g. an ascii or utf-8 string)
+     *
+     * @param offset The offset within the memory area of the start of the string.
+     * @return A byte array containing a copy of the data.
+     */
+    public byte[] getZeroTerminatedByteArray(long offset);
+
+    /**
+     * Reads a zero terminated byte array (e.g. an ascii or utf-8 string)
+     *
+     * @param offset The offset within the memory area of the start of the string.
+     * @param maxlen The maximum length to search for the zero byte terminator.
+     * @return A byte array containing a copy of the data.
+     */
+    public byte[] getZeroTerminatedByteArray(long offset, int maxlen);
+
+    /**
+     * Writes a byte array to memory, and appends a zero terminator
+     *
+     * @param offset The offset within the memory area of the start of the string.
+     * @param bytes The byte array to write to the memory.
+     * @param off The offset with the byte array to start copying.
+     * @param maxlen The number of bytes of the byte array to write to the memory area. (not including zero byte)
+     */
+    public void putZeroTerminatedByteArray(long offset, byte[] bytes, int off, int len);
 }
